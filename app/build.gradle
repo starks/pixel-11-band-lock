@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application' version '9.4.1'
+}
+
+def generatedResources = layout.buildDirectory.dir('generated/radioResources')
+def radioClient = providers.gradleProperty('pixelAtciScript').orElse(
+    rootProject.file('../pixel-mediatek-radio/pixel-atci.sh').absolutePath
+)
+def copyRadioClient = tasks.register('copyRadioClient', Copy) {
+    from radioClient
+    into generatedResources
+    rename { 'pixel-atci.sh' }
+}
+
+android {
+    namespace = 'io.github.starks.pixelnsg'
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = 'io.github.starks.pixelnsg'
+        minSdk = 34
+        targetSdk = 37
+        versionCode = 3
+        versionName = '0.1.2'
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets.main.resources.srcDir generatedResources.get().asFile
+}
+
+tasks.named('preBuild').configure { dependsOn copyRadioClient }
+
+dependencies {
+    def localApi = providers.gradleProperty('xposedApiJar').orNull
+    if (localApi) {
+        compileOnly files(localApi)
+    } else {
+        compileOnly 'io.github.libxposed:api:102.0.0'
+    }
+}

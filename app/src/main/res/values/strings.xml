@@ -1,0 +1,4 @@
+<resources>
+    <string name="module_name">Pixel 11 Band Lock</string>
+    <string name="module_description">LTE and NR band locking in the Forcing menu on supported rooted Pixels.</string>
+</resources>
