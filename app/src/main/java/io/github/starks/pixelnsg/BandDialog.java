@@ -8,7 +8,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Executor;
@@ -45,10 +44,12 @@ final class BandDialog {
         }
         String[] labels = new String[bands.size()];
         boolean[] checked = new boolean[bands.size()];
+        boolean[] known = new boolean[bands.size()];
         for (int i = 0; i < bands.size(); i++) {
             int band = bands.get(i);
             labels[i] = state.rat().prefix + band;
             checked[i] = state.current().primary().contains(band);
+            known[i] = state.known().contains(band);
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
@@ -64,16 +65,16 @@ final class BandDialog {
         title.setAccessibilityHeading(true);
         heading.addView(title);
 
-        Button selectAll = new Button(builder.getContext(), null, android.R.attr.borderlessButtonStyle);
+        Button bulk = new Button(builder.getContext(), null, android.R.attr.borderlessButtonStyle);
         LinearLayout.LayoutParams buttonLayout = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         buttonLayout.gravity = Gravity.END;
-        heading.addView(selectAll, buttonLayout);
+        heading.addView(bulk, buttonLayout);
 
         builder.setCustomTitle(heading)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     checked[which] = selected;
-                    updateSelectionControls(selectAll, (AlertDialog) dialog, checked);
+                    updateSelectionControls(bulk, (AlertDialog) dialog, checked, known);
                 })
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Apply lock", null);
@@ -88,12 +89,14 @@ final class BandDialog {
                     }));
         }
         AlertDialog dialog = builder.show();
-        updateSelectionControls(selectAll, dialog, checked);
-        selectAll.setOnClickListener(view -> {
-            boolean selected = countSelected(checked) != checked.length;
-            Arrays.fill(checked, selected);
-            for (int i = 0; i < checked.length; i++) dialog.getListView().setItemChecked(i, selected);
-            updateSelectionControls(selectAll, dialog, checked);
+        updateSelectionControls(bulk, dialog, checked, known);
+        bulk.setOnClickListener(view -> {
+            boolean selectKnown = hasUnselectedKnownBand(checked, known);
+            for (int i = 0; i < checked.length; i++) {
+                checked[i] = selectKnown && known[i];
+                dialog.getListView().setItemChecked(i, checked[i]);
+            }
+            updateSelectionControls(bulk, dialog, checked, known);
         });
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             Set<Integer> selection = new TreeSet<>();
@@ -109,10 +112,17 @@ final class BandDialog {
         });
     }
 
-    private static void updateSelectionControls(Button selectAll, AlertDialog dialog, boolean[] checked) {
+    private static void updateSelectionControls(Button bulk, AlertDialog dialog, boolean[] checked, boolean[] known) {
         int selected = countSelected(checked);
-        selectAll.setText(selected == checked.length ? "Deselect all" : "Select all");
+        boolean selectKnown = hasUnselectedKnownBand(checked, known);
+        bulk.setText(selectKnown || selected == 0 ? "Select known bands" : "Deselect all");
+        bulk.setEnabled(selectKnown || selected > 0);
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(selected > 0);
+    }
+
+    private static boolean hasUnselectedKnownBand(boolean[] checked, boolean[] known) {
+        for (int i = 0; i < known.length; i++) if (known[i] && !checked[i]) return true;
+        return false;
     }
 
     private static int countSelected(boolean[] checked) {

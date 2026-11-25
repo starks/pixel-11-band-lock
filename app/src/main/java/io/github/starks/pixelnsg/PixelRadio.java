@@ -32,7 +32,7 @@ final class PixelRadio {
         }
     }
 
-    record State(Rat rat, Set<Integer> supported, Mask current, int subId, boolean hasRestore) {}
+    record State(Rat rat, Set<Integer> supported, Set<Integer> known, Mask current, int subId, boolean hasRestore) {}
 
     record Mask(Rat rat, String[] fields, Set<Integer> primary, Set<Integer> secondary) {
         static Mask parse(Rat rat, String response) throws IOException {
@@ -132,7 +132,11 @@ final class PixelRadio {
         Mask supported = query("capabilities", rat);
         Mask current = query("read", rat);
         checkSubscription(subId);
-        return new State(rat, supported.primary, current, subId, snapshots.contains(key(rat, subId)));
+        String saved = snapshots.getString(key(rat, subId), null);
+        Set<Integer> known = new TreeSet<>(current.primary);
+        if (saved != null) known.addAll(Mask.parse(rat, saved).primary);
+        known.retainAll(supported.primary);
+        return new State(rat, supported.primary, known, current, subId, saved != null);
     }
 
     void apply(State displayed, Set<Integer> selection) throws Exception {
